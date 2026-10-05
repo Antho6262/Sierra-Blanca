@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sierra Blanca — Connexion</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: #16181c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .login-bg {
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(rgba(22,24,28,0.93), rgba(22,24,28,0.93)),
+        url('img/logo.png') center/min(80vmin, 700px) no-repeat,
+        radial-gradient(ellipse at center, #1c1f24 0%, #16181c 70%);
+    }
+    .login-box {
+      position: relative;
+      z-index: 1;
+      background: #1c1f24;
+      border: 1px solid #2a2e35;
+      border-radius: 16px;
+      padding: 40px;
+      width: 380px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(214,40,40,0.12);
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-logo .monogram {
+      display: inline-block;
+      width: 130px;
+      height: 130px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 14px rgba(214,40,40,0.35));
+    }
+    .login-title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #f2f4f7;
+      margin-bottom: 4px;
+    }
+    .login-subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #d62828;
+      margin-bottom: 28px;
+    }
+    .form-group { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 11px;
+      color: #8a939e;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    select, input {
+      width: 100%;
+      background: #16181c;
+      border: 1px solid #2a2e35;
+      border-radius: 8px;
+      color: #f2f4f7;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:focus, input:focus { border-color: #d62828; }
+    select option { background: #16181c; }
+    .btn-login {
+      width: 100%;
+      background: #d62828;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .btn-login:hover { background: #ff4d4d; }
+    .error {
+      background: #c0392b15;
+      border: 1px solid #c0392b40;
+      color: #e74c3c;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .loading { opacity: 0.6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="login-bg"></div>
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="img/logo.png" alt="Sierra Blanca" class="monogram">
+    </div>
+    <div class="login-title">Sierra Blanca</div>
+    <div class="login-subtitle">Espace privé — Accès réservé aux membres</div>
+
+    <div class="form-group">
+      <label>Membre</label>
+      <select id="sel-membre">
+        <option value="">— Sélectionner un membre —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input type="password" id="inp-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Connexion</button>
+    <div class="error" id="err-msg"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script>
+    // Charger les membres
+    async function loadMembres() {
+      const snap = await db.ref('membres').once('value');
+      const sel = document.getElementById('sel-membre');
+      const membres = [];
+      Object.entries(snap.val() || {}).forEach(([id, d]) => {
+        if (d.actif !== false) membres.push({ id, ...d });
+      });
+      membres.sort((a, b) => (a.prenom + a.nom).localeCompare(b.prenom + b.nom));
+      membres.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.prenom + ' ' + m.nom + ' — ' + m.grade;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function doLogin() {
+      const membreId = document.getElementById('sel-membre').value;
+      const password = document.getElementById('inp-password').value;
+      const errMsg   = document.getElementById('err-msg');
+      errMsg.style.display = 'none';
+
+      if (!membreId) { errMsg.textContent = 'Sélectionne un membre.'; errMsg.style.display = 'block'; return; }
+      if (!password) { errMsg.textContent = 'Entre ton mot de passe.'; errMsg.style.display = 'block'; return; }
+
+      const snap = await db.ref('membres/' + membreId).once('value');
+      const membre = snap.val();
+      if (!membre) { errMsg.textContent = 'Membre introuvable.'; errMsg.style.display = 'block'; return; }
+      if (membre.mot_de_passe !== password) { errMsg.textContent = 'Mot de passe incorrect.'; errMsg.style.display = 'block'; return; }
+
+      sessionStorage.setItem('jimenez_user', JSON.stringify({
+        id: membreId, prenom: membre.prenom, nom: membre.nom,
+        grade: membre.grade, role: membre.role || 'membre',
+        quota_drogue: membre.quota_drogue || 0
+      }));
+      window.location.href = 'pages/dashboard.html';
+    }
+
+    document.getElementById('inp-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    loadMembres();
+
+    // Si déjà connecté
+    const existing = sessionStorage.getItem('jimenez_user');
+    if (existing) window.location.href = 'pages/dashboard.html';
+  </script>
+</body>
+</html>
